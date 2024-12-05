@@ -92,12 +92,76 @@ print_status "Creating project directory at ${PROJECT_DIR}..."
 mkdir -p ${PROJECT_DIR}
 cd ${PROJECT_DIR}
 
-# Clone the repository
-print_status "Cloning repository..."
+# Create project directory structure
+print_status "Creating project directory structure..."
+mkdir -p ${PROJECT_DIR}/{backend,frontend}
+mkdir -p ${PROJECT_DIR}/backend/{src,config,models,controllers,routes,middleware}
+mkdir -p ${PROJECT_DIR}/frontend/web
+
+# Copy configuration files
+print_status "Setting up configuration files..."
+
+# Create backend package.json
+cat > ${PROJECT_DIR}/backend/package.json << 'EOL'
+{
+    "name": "stockpile-backend",
+    "version": "1.0.0",
+    "description": "Backend for Stockpile Management System",
+    "main": "src/server.js",
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "nodemon src/server.js",
+        "test": "jest"
+    },
+    "dependencies": {
+        "bcryptjs": "^2.4.3",
+        "cors": "^2.8.5",
+        "dotenv": "^16.0.3",
+        "express": "^4.18.2",
+        "helmet": "^6.0.1",
+        "jsonwebtoken": "^9.0.0",
+        "morgan": "^1.10.0",
+        "pg": "^8.9.0",
+        "pg-hstore": "^2.3.4",
+        "sequelize": "^6.28.0"
+    },
+    "devDependencies": {
+        "jest": "^29.4.3",
+        "nodemon": "^2.0.20"
+    }
+}
+EOL
+
+# Create database config
+mkdir -p ${PROJECT_DIR}/backend/config
+cat > ${PROJECT_DIR}/backend/config/database.js << 'EOL'
+require('dotenv').config();
+
+module.exports = {
+    database: process.env.DB_NAME || 'stockpile',
+    username: process.env.DB_USER || 'stockpileuser',
+    password: process.env.DB_PASSWORD || 'your_password_here',
+    host: process.env.DB_HOST || 'localhost',
+    dialect: 'postgres',
+    port: process.env.DB_PORT || 5432,
+    pool: {
+        max: 5,
+        min: 0,
+        acquire: 30000,
+        idle: 10000
+    }
+};
+EOL
+
+# Clone the repository (if using git) or copy files
 if [ -d ".git" ]; then
     git pull
 else
-    git clone https://github.com/dhnorval/testing.git .
+    # If not using git, copy the model files
+    cp -r models/* ${PROJECT_DIR}/backend/models/
+    cp -r routes/* ${PROJECT_DIR}/backend/routes/
+    cp -r controllers/* ${PROJECT_DIR}/backend/controllers/
+    cp -r middleware/* ${PROJECT_DIR}/backend/middleware/
 fi
 
 # Setup PostgreSQL database
