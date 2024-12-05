@@ -96,7 +96,7 @@ cd ${PROJECT_DIR}
 print_status "Creating project directory structure..."
 mkdir -p ${PROJECT_DIR}/{backend,frontend}
 mkdir -p ${PROJECT_DIR}/backend/{src,config,models,controllers,routes,middleware}
-mkdir -p ${PROJECT_DIR}/frontend/web
+mkdir -p ${PROJECT_DIR}/frontend/web/{src,public,src/components,src/pages,src/utils,src/services}
 
 # Copy configuration files
 print_status "Setting up configuration files..."
@@ -200,8 +200,7 @@ EOL
 # Setup frontend
 print_status "Setting up frontend..."
 cd ${PROJECT_DIR}/frontend/web
-npm install
-npm run build
+npm install --legacy-peer-deps
 
 # Verify frontend dependencies
 if [ ! -d "node_modules" ]; then
@@ -213,6 +212,131 @@ cat > .env << EOL
 REACT_APP_API_URL=http://localhost:5000/api
 REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
 EOL
+
+# Create frontend package.json
+cat > ${PROJECT_DIR}/frontend/web/package.json << 'EOL'
+{
+    "name": "stockpile-frontend",
+    "version": "1.0.0",
+    "private": true,
+    "dependencies": {
+        "@material-ui/core": "^4.12.4",
+        "@material-ui/icons": "^4.11.3",
+        "@testing-library/jest-dom": "^5.16.5",
+        "@testing-library/react": "^13.4.0",
+        "@testing-library/user-event": "^13.5.0",
+        "axios": "^1.3.4",
+        "chart.js": "^4.2.1",
+        "mapbox-gl": "^2.13.0",
+        "react": "^18.2.0",
+        "react-chartjs-2": "^5.2.0",
+        "react-dom": "^18.2.0",
+        "react-router-dom": "^6.8.2",
+        "react-scripts": "5.0.1",
+        "web-vitals": "^2.1.4"
+    },
+    "scripts": {
+        "start": "react-scripts start",
+        "build": "react-scripts build",
+        "test": "react-scripts test",
+        "eject": "react-scripts eject"
+    },
+    "eslintConfig": {
+        "extends": [
+            "react-app",
+            "react-app/jest"
+        ]
+    },
+    "browserslist": {
+        "production": [
+            ">0.2%",
+            "not dead",
+            "not op_mini all"
+        ],
+        "development": [
+            "last 1 chrome version",
+            "last 1 firefox version",
+            "last 1 safari version"
+        ]
+    }
+}
+EOL
+
+# Create frontend public/index.html
+mkdir -p ${PROJECT_DIR}/frontend/web/public
+cat > ${PROJECT_DIR}/frontend/web/public/index.html << 'EOL'
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Stockpile Management System" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Stockpile Manager</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+EOL
+
+# Create frontend public/manifest.json
+cat > ${PROJECT_DIR}/frontend/web/public/manifest.json << 'EOL'
+{
+  "short_name": "Stockpile",
+  "name": "Stockpile Management System",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
+EOL
+
+# Create src/index.js if it doesn't exist
+cat > ${PROJECT_DIR}/frontend/web/src/index.js << 'EOL'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+EOL
+
+# Create basic CSS
+cat > ${PROJECT_DIR}/frontend/web/src/index.css << 'EOL'
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+EOL
+
+# Build the frontend after setup
+npm run build
 
 # Setup systemd services
 print_status "Setting up systemd services..."
