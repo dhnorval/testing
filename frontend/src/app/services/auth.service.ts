@@ -40,4 +40,8 @@ export class AuthService {
     localStorage.removeItem('currentUser');
     this.currentUserSubject.next(null);
   }
+
+  isAuthenticated(): boolean {
+    return this.currentUserValue !== null;
+  }
 } 
