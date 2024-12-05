@@ -98,8 +98,19 @@ mkdir -p ${PROJECT_DIR}/{backend,frontend}
 mkdir -p ${PROJECT_DIR}/backend/{src,config,models,controllers,routes,middleware}
 mkdir -p ${PROJECT_DIR}/frontend/web/{src,public,src/components,src/pages,src/utils,src/services}
 
-# Copy configuration files
-print_status "Setting up configuration files..."
+# Setup PostgreSQL database
+print_status "Setting up PostgreSQL database..."
+su - postgres << EOF
+psql -c "CREATE DATABASE stockpile;"
+psql -c "CREATE USER stockpileuser WITH PASSWORD 'your_password_here';"
+psql -c "ALTER ROLE stockpileuser SET client_encoding TO 'utf8';"
+psql -c "ALTER ROLE stockpileuser SET default_transaction_isolation TO 'read committed';"
+psql -c "ALTER ROLE stockpileuser SET timezone TO 'UTC';"
+psql -c "GRANT ALL PRIVILEGES ON DATABASE stockpile TO stockpileuser;"
+EOF
+
+# Create backend files
+print_status "Creating backend files..."
 
 # Create backend package.json
 cat > ${PROJECT_DIR}/backend/package.json << 'EOL'
@@ -133,7 +144,6 @@ cat > ${PROJECT_DIR}/backend/package.json << 'EOL'
 EOL
 
 # Create database config
-mkdir -p ${PROJECT_DIR}/backend/config
 cat > ${PROJECT_DIR}/backend/config/database.js << 'EOL'
 require('dotenv').config();
 
@@ -153,64 +163,258 @@ module.exports = {
 };
 EOL
 
-# Clone the repository (if using git) or copy files
-if [ -d ".git" ]; then
-    git pull
-else
-    # If not using git, copy the model files
-    cp -r models/* ${PROJECT_DIR}/backend/models/
-    cp -r routes/* ${PROJECT_DIR}/backend/routes/
-    cp -r controllers/* ${PROJECT_DIR}/backend/controllers/
-    cp -r middleware/* ${PROJECT_DIR}/backend/middleware/
-fi
+# Create Stockpile model
+cat > ${PROJECT_DIR}/backend/models/Stockpile.js << 'EOL'
+module.exports = (sequelize, DataTypes) => {
+    const Stockpile = sequelize.define('Stockpile', {
+        name: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        material: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        grade: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        dimensions: {
+            type: DataTypes.JSONB,
+            allowNull: false,
+            defaultValue: {
+                length: 0,
+                width: 0,
+                height: 0
+            }
+        },
+        volume: {
+            type: DataTypes.FLOAT,
+            allowNull: false
+        },
+        location: {
+            type: DataTypes.GEOMETRY('POINT'),
+            allowNull: false
+        },
+        status: {
+            type: DataTypes.ENUM('active', 'processed', 'reclaimed'),
+            defaultValue: 'active'
+        }
+    });
 
-# Setup PostgreSQL database
-print_status "Setting up PostgreSQL database..."
-su - postgres << EOF
-psql -c "CREATE DATABASE stockpile;"
-psql -c "CREATE USER stockpileuser WITH PASSWORD 'your_password_here';"
-psql -c "ALTER ROLE stockpileuser SET client_encoding TO 'utf8';"
-psql -c "ALTER ROLE stockpileuser SET default_transaction_isolation TO 'read committed';"
-psql -c "ALTER ROLE stockpileuser SET timezone TO 'UTC';"
-psql -c "GRANT ALL PRIVILEGES ON DATABASE stockpile TO stockpileuser;"
-EOF
-
-# Setup backend
-print_status "Setting up backend..."
-cd ${PROJECT_DIR}/backend
-npm install
-
-# Verify backend dependencies
-if [ ! -d "node_modules" ]; then
-    print_error "Failed to install backend dependencies"
-fi
-
-# Create backend environment file
-cat > .env << EOL
-PORT=5000
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=stockpile
-DB_USER=stockpileuser
-DB_PASSWORD=your_password_here
-JWT_SECRET=$(openssl rand -hex 32)
-NODE_ENV=production
+    return Stockpile;
+};
 EOL
 
-# Setup frontend
-print_status "Setting up frontend..."
-cd ${PROJECT_DIR}/frontend/web
-npm install --legacy-peer-deps
+# Create server.js
+cat > ${PROJECT_DIR}/backend/src/server.js << 'EOL'
+const express = require('express');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+require('dotenv').config();
 
-# Verify frontend dependencies
-if [ ! -d "node_modules" ]; then
-    print_error "Failed to install frontend dependencies"
-fi
+const db = require('../models');
+const app = express();
 
-# Create frontend environment file
-cat > .env << EOL
-REACT_APP_API_URL=http://localhost:5000/api
-REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
+// Middleware
+app.use(cors());
+app.use(helmet());
+app.use(morgan('dev'));
+app.use(express.json());
+
+// Routes
+app.use('/api/stockpiles', require('../routes/stockpiles'));
+app.use('/api/users', require('../routes/users'));
+
+// Database synchronization and server start
+const PORT = process.env.PORT || 5000;
+
+db.sequelize.sync({ alter: true })
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
+    })
+    .catch(err => {
+        console.error('Unable to connect to the database:', err);
+    });
+EOL
+
+# Create frontend files
+print_status "Creating frontend files..."
+
+# Create public directory and files
+mkdir -p ${PROJECT_DIR}/frontend/web/public
+
+# Create index.html
+cat > ${PROJECT_DIR}/frontend/web/public/index.html << 'EOL'
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Stockpile Management System" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Stockpile Manager</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+EOL
+
+# Create manifest.json
+cat > ${PROJECT_DIR}/frontend/web/public/manifest.json << 'EOL'
+{
+  "short_name": "Stockpile",
+  "name": "Stockpile Management System",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff"
+}
+EOL
+
+# Create robots.txt
+cat > ${PROJECT_DIR}/frontend/web/public/robots.txt << 'EOL'
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Disallow:
+EOL
+
+# Create src directory and files
+mkdir -p ${PROJECT_DIR}/frontend/web/src
+
+# Create index.js
+cat > ${PROJECT_DIR}/frontend/web/src/index.js << 'EOL'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import './index.css';
+import App from './App';
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+EOL
+
+# Create index.css
+cat > ${PROJECT_DIR}/frontend/web/src/index.css << 'EOL'
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+EOL
+
+# Create App.js
+cat > ${PROJECT_DIR}/frontend/web/src/App.js << 'EOL'
+import React from 'react';
+import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
+import { ThemeProvider, createTheme } from '@material-ui/core/styles';
+import CssBaseline from '@material-ui/core/CssBaseline';
+import Navigation from './components/Navigation';
+
+const theme = createTheme({
+  palette: {
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+  },
+});
+
+function App() {
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <Navigation />
+        <Switch>
+          <Route exact path="/" component={Dashboard} />
+          <Route path="/stockpiles" component={StockpileList} />
+          <Route path="/add-stockpile" component={StockpileForm} />
+          <Route path="/login" component={Login} />
+        </Switch>
+      </Router>
+    </ThemeProvider>
+  );
+}
+
+export default App;
+EOL
+
+# Create Navigation component
+cat > ${PROJECT_DIR}/frontend/web/src/components/Navigation.js << 'EOL'
+import React from 'react';
+import { AppBar, Toolbar, Typography, Button, makeStyles } from '@material-ui/core';
+import { Link as RouterLink } from 'react-router-dom';
+
+const useStyles = makeStyles((theme) => ({
+    root: {
+        flexGrow: 1,
+    },
+    title: {
+        flexGrow: 1,
+    },
+    link: {
+        color: 'white',
+        textDecoration: 'none',
+        marginLeft: theme.spacing(2),
+    },
+}));
+
+function Navigation() {
+    const classes = useStyles();
+
+    return (
+        <AppBar position="static">
+            <Toolbar>
+                <Typography variant="h6" className={classes.title}>
+                    Stockpile Manager
+                </Typography>
+                <Button color="inherit" component={RouterLink} to="/">
+                    Dashboard
+                </Button>
+                <Button color="inherit" component={RouterLink} to="/stockpiles">
+                    Stockpiles
+                </Button>
+                <Button color="inherit" component={RouterLink} to="/add-stockpile">
+                    Add Stockpile
+                </Button>
+                <Button color="inherit" component={RouterLink} to="/login">
+                    Login
+                </Button>
+            </Toolbar>
+        </AppBar>
+    );
+}
+
+export default Navigation;
 EOL
 
 # Create frontend package.json
@@ -262,80 +466,35 @@ cat > ${PROJECT_DIR}/frontend/web/package.json << 'EOL'
 }
 EOL
 
-# Create frontend public/index.html
-mkdir -p ${PROJECT_DIR}/frontend/web/public
-cat > ${PROJECT_DIR}/frontend/web/public/index.html << 'EOL'
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="Stockpile Management System" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <title>Stockpile Manager</title>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
-</html>
+# Setup backend
+print_status "Setting up backend..."
+cd ${PROJECT_DIR}/backend
+npm install
+
+# Create backend environment file
+cat > .env << EOL
+PORT=5000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=stockpile
+DB_USER=stockpileuser
+DB_PASSWORD=your_password_here
+JWT_SECRET=$(openssl rand -hex 32)
+NODE_ENV=production
 EOL
 
-# Create frontend public/manifest.json
-cat > ${PROJECT_DIR}/frontend/web/public/manifest.json << 'EOL'
-{
-  "short_name": "Stockpile",
-  "name": "Stockpile Management System",
-  "icons": [
-    {
-      "src": "favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
-}
+# Setup frontend
+print_status "Setting up frontend..."
+cd ${PROJECT_DIR}/frontend/web
+npm install --legacy-peer-deps
+
+# Create frontend environment file
+cat > .env << EOL
+REACT_APP_API_URL=http://localhost:5000/api
+REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
 EOL
 
-# Create src/index.js if it doesn't exist
-cat > ${PROJECT_DIR}/frontend/web/src/index.js << 'EOL'
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import './index.css';
-import App from './App';
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
-EOL
-
-# Create basic CSS
-cat > ${PROJECT_DIR}/frontend/web/src/index.css << 'EOL'
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-}
-EOL
-
-# Build the frontend after setup
+# Build the frontend
 npm run build
 
 # Setup systemd services
