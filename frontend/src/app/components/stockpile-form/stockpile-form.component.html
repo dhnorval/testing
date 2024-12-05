@@ -1,0 +1,81 @@
+<div class="container">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h4 class="mb-0">Create New Stockpile</h4>
+        </div>
+        <div class="card-body">
+          <form [formGroup]="stockpileForm" (ngSubmit)="onSubmit()">
+            <div class="mb-3">
+              <label class="form-label">Name</label>
+              <input type="text" formControlName="name" class="form-control"
+                     [ngClass]="{ 'is-invalid': stockpileForm.get('name')?.touched && stockpileForm.get('name')?.invalid }">
+              <div class="invalid-feedback">Name is required</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Material</label>
+              <input type="text" formControlName="material" class="form-control"
+                     [ngClass]="{ 'is-invalid': stockpileForm.get('material')?.touched && stockpileForm.get('material')?.invalid }">
+              <div class="invalid-feedback">Material is required</div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Grade</label>
+              <input type="text" formControlName="grade" class="form-control"
+                     [ngClass]="{ 'is-invalid': stockpileForm.get('grade')?.touched && stockpileForm.get('grade')?.invalid }">
+              <div class="invalid-feedback">Grade is required</div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Length (m)</label>
+                <input type="number" formControlName="length" class="form-control" (input)="calculateVolume()"
+                       [ngClass]="{ 'is-invalid': stockpileForm.get('length')?.touched && stockpileForm.get('length')?.invalid }">
+                <div class="invalid-feedback">Valid length is required</div>
+              </div>
+
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Width (m)</label>
+                <input type="number" formControlName="width" class="form-control" (input)="calculateVolume()"
+                       [ngClass]="{ 'is-invalid': stockpileForm.get('width')?.touched && stockpileForm.get('width')?.invalid }">
+                <div class="invalid-feedback">Valid width is required</div>
+              </div>
+
+              <div class="col-md-4 mb-3">
+                <label class="form-label">Height (m)</label>
+                <input type="number" formControlName="height" class="form-control" (input)="calculateVolume()"
+                       [ngClass]="{ 'is-invalid': stockpileForm.get('height')?.touched && stockpileForm.get('height')?.invalid }">
+                <div class="invalid-feedback">Valid height is required</div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">Volume (m³)</label>
+              <input type="number" formControlName="volume" class="form-control" readonly>
+            </div>
+
+            <div formGroupName="location" class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Longitude</label>
+                <input type="number" [formControlName]="0" class="form-control">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label">Latitude</label>
+                <input type="number" [formControlName]="1" class="form-control">
+              </div>
+            </div>
+
+            <div class="alert alert-danger" *ngIf="error">{{error}}</div>
+
+            <button type="submit" class="btn btn-primary" [disabled]="loading || stockpileForm.invalid">
+              <span *ngIf="loading" class="spinner-border spinner-border-sm me-1"></span>
+              Create Stockpile
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div> 
