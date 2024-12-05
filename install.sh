@@ -336,33 +336,37 @@ import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@material-ui/core/styles';
 import CssBaseline from '@material-ui/core/CssBaseline';
 import Navigation from './components/Navigation';
+import Dashboard from './pages/Dashboard';
+import StockpileList from './pages/StockpileList';
+import StockpileForm from './pages/StockpileForm';
+import Login from './pages/Login';
 
 const theme = createTheme({
-  palette: {
-    primary: {
-      main: '#1976d2',
+    palette: {
+        primary: {
+            main: '#1976d2',
+        },
+        secondary: {
+            main: '#dc004e',
+        },
     },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
 });
 
 function App() {
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Router>
-        <Navigation />
-        <Switch>
-          <Route exact path="/" component={Dashboard} />
-          <Route path="/stockpiles" component={StockpileList} />
-          <Route path="/add-stockpile" component={StockpileForm} />
-          <Route path="/login" component={Login} />
-        </Switch>
-      </Router>
-    </ThemeProvider>
-  );
+    return (
+        <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <Router>
+                <Navigation />
+                <Switch>
+                    <Route exact path="/" component={Dashboard} />
+                    <Route path="/stockpiles" component={StockpileList} />
+                    <Route path="/add-stockpile" component={StockpileForm} />
+                    <Route path="/login" component={Login} />
+                </Switch>
+            </Router>
+        </ThemeProvider>
+    );
 }
 
 export default App;
@@ -435,7 +439,7 @@ cat > ${PROJECT_DIR}/frontend/web/package.json << 'EOL'
         "react": "^18.2.0",
         "react-chartjs-2": "^5.2.0",
         "react-dom": "^18.2.0",
-        "react-router-dom": "^6.8.2",
+        "react-router-dom": "^5.3.4",
         "react-scripts": "5.0.1",
         "web-vitals": "^2.1.4"
     },
@@ -486,16 +490,25 @@ EOL
 # Setup frontend
 print_status "Setting up frontend..."
 cd ${PROJECT_DIR}/frontend/web
-npm install --legacy-peer-deps
+npm install --legacy-peer-deps --force
+
+# Clear any existing build
+rm -rf build
+
+# Create empty .env file if it doesn't exist
+touch .env
+
+# Set NODE_OPTIONS to increase memory limit
+export NODE_OPTIONS="--max-old-space-size=4096"
+
+# Build with CI=false to ignore warnings
+CI=false npm run build
 
 # Create frontend environment file
 cat > .env << EOL
 REACT_APP_API_URL=http://localhost:5000/api
 REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
 EOL
-
-# Build the frontend
-npm run build
 
 # Setup systemd services
 print_status "Setting up systemd services..."
@@ -633,4 +646,79 @@ module.exports = (sequelize, DataTypes) => {
 
     return User;
 };
+EOL
+
+# Create pages directory
+mkdir -p ${PROJECT_DIR}/frontend/web/src/pages
+
+# Create Dashboard page
+cat > ${PROJECT_DIR}/frontend/web/src/pages/Dashboard.js << 'EOL'
+import React from 'react';
+import { Container, Typography } from '@material-ui/core';
+
+function Dashboard() {
+    return (
+        <Container>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Dashboard
+            </Typography>
+        </Container>
+    );
+}
+
+export default Dashboard;
+EOL
+
+# Create StockpileList page
+cat > ${PROJECT_DIR}/frontend/web/src/pages/StockpileList.js << 'EOL'
+import React from 'react';
+import { Container, Typography } from '@material-ui/core';
+
+function StockpileList() {
+    return (
+        <Container>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Stockpile List
+            </Typography>
+        </Container>
+    );
+}
+
+export default StockpileList;
+EOL
+
+# Create StockpileForm page
+cat > ${PROJECT_DIR}/frontend/web/src/pages/StockpileForm.js << 'EOL'
+import React from 'react';
+import { Container, Typography } from '@material-ui/core';
+
+function StockpileForm() {
+    return (
+        <Container>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Add Stockpile
+            </Typography>
+        </Container>
+    );
+}
+
+export default StockpileForm;
+EOL
+
+# Create Login page
+cat > ${PROJECT_DIR}/frontend/web/src/pages/Login.js << 'EOL'
+import React from 'react';
+import { Container, Typography } from '@material-ui/core';
+
+function Login() {
+    return (
+        <Container>
+            <Typography variant="h4" component="h1" gutterBottom>
+                Login
+            </Typography>
+        </Container>
+    );
+}
+
+export default Login;
 EOL
