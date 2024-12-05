@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from './services/auth.service';
+import { User } from './models/user.model';
 
 @Component({
   selector: 'app-root',
@@ -9,15 +10,18 @@ import { AuthService } from './services/auth.service';
 })
 export class AppComponent {
   title = 'Stockpile Management';
-
-  get isLoggedIn(): boolean {
-    return this.authService.currentUserValue !== null;
-  }
+  currentUser: User | null = null;
 
   constructor(
     private router: Router,
     private authService: AuthService
-  ) {}
+  ) {
+    this.authService.currentUser.subscribe(x => this.currentUser = x);
+  }
+
+  get isLoggedIn(): boolean {
+    return this.currentUser !== null;
+  }
 
   logout(event: Event): void {
     event.preventDefault();
