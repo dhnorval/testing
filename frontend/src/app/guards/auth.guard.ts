@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Router, CanActivate } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { User } from '../models/user.model';
 
 @Injectable({
   providedIn: 'root'
@@ -12,7 +13,7 @@ export class AuthGuard implements CanActivate {
   ) {}
 
   canActivate(): boolean {
-    const currentUser = this.authService.currentUserValue;
+    const currentUser: User | null = this.authService.currentUserValue;
     if (currentUser) {
       return true;
     }
