@@ -9,6 +9,7 @@ import { LoginComponent } from './components/login/login.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { StockpileListComponent } from './components/stockpile-list/stockpile-list.component';
 import { StockpileFormComponent } from './components/stockpile-form/stockpile-form.component';
+import { AuthService } from './services/auth.service';
 
 @NgModule({
   declarations: [
@@ -25,7 +26,7 @@ import { StockpileFormComponent } from './components/stockpile-form/stockpile-fo
     FormsModule,
     ReactiveFormsModule
   ],
-  providers: [],
+  providers: [AuthService],
   bootstrap: [AppComponent]
 })
 export class AppModule { } 

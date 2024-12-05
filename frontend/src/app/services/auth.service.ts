@@ -3,14 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-
-interface User {
-  id: number;
-  email: string;
-  name: string;
-  role: string;
-  token?: string;
-}
+import { User } from '../models/user.model';
 
 @Injectable({
   providedIn: 'root'
@@ -30,10 +23,9 @@ export class AuthService {
     return this.currentUserSubject.value;
   }
 
-  login(email: string, password: string) {
+  login(email: string, password: string): Observable<User> {
     return this.http.post<any>(`${environment.apiUrl}/auth/login`, { email, password })
       .pipe(map(response => {
-        // store user details and jwt token in local storage
         const user = {
           ...response.user,
           token: response.token
@@ -44,8 +36,7 @@ export class AuthService {
       }));
   }
 
-  logout() {
-    // remove user from local storage to log user out
+  logout(): void {
     localStorage.removeItem('currentUser');
     this.currentUserSubject.next(null);
   }
