@@ -10,6 +10,7 @@ import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { StockpileListComponent } from './components/stockpile-list/stockpile-list.component';
 import { StockpileFormComponent } from './components/stockpile-form/stockpile-form.component';
 import { AuthService } from './services/auth.service';
+import { AuthGuard } from './guards/auth.guard';
 
 @NgModule({
   declarations: [
@@ -27,7 +28,8 @@ import { AuthService } from './services/auth.service';
     ReactiveFormsModule
   ],
   providers: [
-    AuthService
+    AuthService,
+    AuthGuard
   ],
   bootstrap: [AppComponent]
 })
