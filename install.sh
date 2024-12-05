@@ -32,7 +32,13 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Check and install system dependencies
+# Function to check PostgreSQL connection
+check_postgres() {
+    su - postgres -c "psql -c '\q'" >/dev/null 2>&1
+    return $?
+}
+
+# Check system dependencies
 print_status "Checking system dependencies..."
 
 # Check/Install curl
@@ -46,23 +52,38 @@ if ! command_exists node; then
     print_status "Installing Node.js and npm..."
     curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
     apt-get install -y nodejs
+    
+    # Verify installation
+    if ! command_exists node || ! command_exists npm; then
+        print_error "Failed to install Node.js and npm"
+    fi
+fi
+
+# Check Node.js version
+NODE_VERSION=$(node -v | cut -d'v' -f2)
+if [ "${NODE_VERSION%%.*}" -lt 16 ]; then
+    print_error "Node.js version must be 16 or higher. Current version: ${NODE_VERSION}"
+fi
+
+# Check/Install PostgreSQL
+if ! command_exists psql; then
+    print_status "Installing PostgreSQL..."
+    apt-get install -y postgresql postgresql-contrib
+    
+    # Start PostgreSQL service
+    systemctl start postgresql
+    systemctl enable postgresql
+    
+    # Verify installation
+    if ! check_postgres; then
+        print_error "Failed to install PostgreSQL"
+    fi
 fi
 
 # Check/Install Git
 if ! command_exists git; then
     print_status "Installing git..."
     apt-get install -y git
-fi
-
-# Check/Install MongoDB
-if ! command_exists mongod; then
-    print_status "Installing MongoDB..."
-    wget -qO - https://www.mongodb.org/static/pgp/server-5.0.asc | apt-key add -
-    echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse" | tee /etc/apt/sources.list.d/mongodb-org-5.0.list
-    apt-get update
-    apt-get install -y mongodb-org
-    systemctl start mongod
-    systemctl enable mongod
 fi
 
 # Create project directory
@@ -73,18 +94,42 @@ cd ${PROJECT_DIR}
 
 # Clone the repository
 print_status "Cloning repository..."
-git clone https://github.com/dhnorval/testing.git .
+if [ -d ".git" ]; then
+    git pull
+else
+    git clone https://github.com/dhnorval/testing.git .
+fi
+
+# Setup PostgreSQL database
+print_status "Setting up PostgreSQL database..."
+su - postgres << EOF
+psql -c "CREATE DATABASE stockpile;"
+psql -c "CREATE USER stockpileuser WITH PASSWORD 'your_password_here';"
+psql -c "ALTER ROLE stockpileuser SET client_encoding TO 'utf8';"
+psql -c "ALTER ROLE stockpileuser SET default_transaction_isolation TO 'read committed';"
+psql -c "ALTER ROLE stockpileuser SET timezone TO 'UTC';"
+psql -c "GRANT ALL PRIVILEGES ON DATABASE stockpile TO stockpileuser;"
+EOF
 
 # Setup backend
 print_status "Setting up backend..."
 cd ${PROJECT_DIR}/backend
 npm install
 
+# Verify backend dependencies
+if [ ! -d "node_modules" ]; then
+    print_error "Failed to install backend dependencies"
+fi
+
 # Create backend environment file
 cat > .env << EOL
 PORT=5000
-MONGODB_URI=mongodb://localhost:27017/stockpile
-JWT_SECRET=your_jwt_secret_here
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=stockpile
+DB_USER=stockpileuser
+DB_PASSWORD=your_password_here
+JWT_SECRET=$(openssl rand -hex 32)
 NODE_ENV=production
 EOL
 
@@ -94,17 +139,25 @@ cd ${PROJECT_DIR}/frontend/web
 npm install
 npm run build
 
+# Verify frontend dependencies
+if [ ! -d "node_modules" ]; then
+    print_error "Failed to install frontend dependencies"
+fi
+
 # Create frontend environment file
 cat > .env << EOL
 REACT_APP_API_URL=http://localhost:5000/api
 REACT_APP_MAPBOX_TOKEN=your_mapbox_token_here
 EOL
 
-# Setup systemd service for backend
+# Setup systemd services
+print_status "Setting up systemd services..."
+
+# Backend service
 cat > /etc/systemd/system/stockpile-backend.service << EOL
 [Unit]
 Description=Stockpile App Backend
-After=network.target
+After=network.target postgresql.service
 
 [Service]
 Type=simple
@@ -118,7 +171,7 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 EOL
 
-# Setup systemd service for frontend
+# Frontend service
 cat > /etc/systemd/system/stockpile-frontend.service << EOL
 [Unit]
 Description=Stockpile App Frontend
@@ -139,10 +192,17 @@ EOL
 # Start services
 print_status "Starting services..."
 systemctl daemon-reload
-systemctl enable stockpile-backend
-systemctl enable stockpile-frontend
-systemctl start stockpile-backend
-systemctl start stockpile-frontend
+systemctl enable stockpile-backend stockpile-frontend
+systemctl start stockpile-backend stockpile-frontend
+
+# Verify services are running
+if ! systemctl is-active --quiet stockpile-backend; then
+    print_error "Backend service failed to start"
+fi
+
+if ! systemctl is-active --quiet stockpile-frontend; then
+    print_error "Frontend service failed to start"
+fi
 
 # Set proper permissions
 chown -R root:root ${PROJECT_DIR}
