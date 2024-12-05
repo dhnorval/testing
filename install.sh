@@ -562,3 +562,75 @@ echo "Frontend: http://localhost:3000"
 echo -e "\nCheck service status with:"
 echo "systemctl status stockpile-backend"
 echo "systemctl status stockpile-frontend"
+
+# Create models/index.js
+cat > ${PROJECT_DIR}/backend/models/index.js << 'EOL'
+const fs = require('fs');
+const path = require('path');
+const Sequelize = require('sequelize');
+const config = require('../config/database');
+
+const db = {};
+
+const sequelize = new Sequelize(
+    config.database,
+    config.username,
+    config.password,
+    config
+);
+
+// Read all model files in the current directory
+fs.readdirSync(__dirname)
+    .filter(file => {
+        return (file.indexOf('.') !== 0) && 
+               (file !== 'index.js') && 
+               (file.slice(-3) === '.js');
+    })
+    .forEach(file => {
+        const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+        db[model.name] = model;
+    });
+
+// Set up associations
+Object.keys(db).forEach(modelName => {
+    if (db[modelName].associate) {
+        db[modelName].associate(db);
+    }
+});
+
+db.sequelize = sequelize;
+db.Sequelize = Sequelize;
+
+module.exports = db;
+EOL
+
+# Create User model
+cat > ${PROJECT_DIR}/backend/models/User.js << 'EOL'
+module.exports = (sequelize, DataTypes) => {
+    const User = sequelize.define('User', {
+        username: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true
+        },
+        email: {
+            type: DataTypes.STRING,
+            allowNull: false,
+            unique: true,
+            validate: {
+                isEmail: true
+            }
+        },
+        password: {
+            type: DataTypes.STRING,
+            allowNull: false
+        },
+        role: {
+            type: DataTypes.ENUM('admin', 'supervisor', 'worker'),
+            defaultValue: 'worker'
+        }
+    });
+
+    return User;
+};
+EOL
