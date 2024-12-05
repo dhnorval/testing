@@ -72,45 +72,8 @@ The objectives of the app are:
         Automated testing tools (Selenium, Jest).
         On-site usability testing.
 
-    Security
-        Adding Time Stamps to all data entries using a TimeStamp authenticator using EJBCA Signinig server.
-        Secure APIs with OAuth2 or JWT.
-        Data encryption (TLS for data in transit, AES for data at rest).
+There should be a login screen with auditing control build in , with an access page to add users and manage which permisions they have on the app.
 
-4. Development Workflow
 
-    Requirement Gathering
-        Engage with stakeholders (mining managers, on-site workers).
-    Prototyping
-        Build wireframes/mockups of the app.
-    Development Phases
-        Start with core features: data capture and inventory management.
-        Incrementally add analytics, reporting, and integrations.
-    Testing
-        Conduct unit testing, integration testing, and field tests.
-    Deployment
-        Initial release on selected platforms (web/mobile).
-    Training
-        Create guides and training sessions for users.
-    Maintenance
-        Regular updates based on feedback and mining operation changes.
 
-5. Milestones
 
-    Phase 1: Core Data Capture and Inventory Management
-        Deliverable: Working app prototype.
-        Timeline: 2-3 months.
-
-    Phase 2: Analytics and Reporting
-        Deliverable: Basic reporting tools.
-        Timeline: 1-2 months.
-
-    Phase 3: Integration and GIS Mapping
-        Deliverable: Fully integrated system with mapping tools.
-        Timeline: 3 months.
-
-    Phase 4: Final Release
-        Deliverable: Full production version with user feedback incorporated.
-        Timeline: 1-2 months.
-
-This plan provides a comprehensive framework for developing your stockpile app. Let me know if you want detailed guidance on specific components!
