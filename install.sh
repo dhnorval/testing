@@ -606,35 +606,37 @@ ng generate component components/stockpile-form
 ng generate service services/auth
 ng generate service services/stockpile
 
-# Update frontend service
-print_status "Creating systemd service for frontend..."
-sudo tee /etc/systemd/system/stockpile-frontend.service << EOF
-[Unit]
-Description=Stockpile App Frontend
-After=network.target stockpile-backend.service
+# Create auth guard
+print_status "Creating auth guard..."
+mkdir -p src/app/guards
+cat > src/app/guards/auth.guard.ts << 'EOF'
+import { Injectable } from '@angular/core';
+import { Router, CanActivate } from '@angular/router';
+import { AuthService } from '../services/auth.service';
 
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$(pwd)
-ExecStart=/usr/bin/npm start -- --host 0.0.0.0 --port 8080 --disable-host-check
-Restart=always
-Environment=NODE_ENV=production
-StandardOutput=append:/var/log/stockpile-frontend.log
-StandardError=append:/var/log/stockpile-frontend.log
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(
+    private router: Router,
+    private authService: AuthService
+  ) {}
 
-[Install]
-WantedBy=multi-user.target
+  canActivate() {
+    const currentUser = this.authService.currentUserValue;
+    if (currentUser) {
+      return true;
+    }
+
+    this.router.navigate(['/login']);
+    return false;
+  }
+}
 EOF
 
-# Create log file for frontend
-sudo touch /var/log/stockpile-frontend.log
-sudo chown $USER:$USER /var/log/stockpile-frontend.log
-
-# Create Angular app files
-print_status "Creating Angular app files..."
-
-# Create app routing module
+# Update app routing module with auth guard
+print_status "Updating app routing module..."
 cat > src/app/app-routing.module.ts << 'EOF'
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
@@ -642,14 +644,15 @@ import { LoginComponent } from './components/login/login.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { StockpileListComponent } from './components/stockpile-list/stockpile-list.component';
 import { StockpileFormComponent } from './components/stockpile-form/stockpile-form.component';
+import { AuthGuard } from './guards/auth.guard';
 
 const routes: Routes = [
-  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+  { path: '', redirectTo: '/login', pathMatch: 'full' },
   { path: 'login', component: LoginComponent },
-  { path: 'dashboard', component: DashboardComponent },
-  { path: 'stockpiles', component: StockpileListComponent },
-  { path: 'stockpiles/new', component: StockpileFormComponent },
-  { path: 'stockpiles/edit/:id', component: StockpileFormComponent }
+  { path: 'dashboard', component: DashboardComponent, canActivate: [AuthGuard] },
+  { path: 'stockpiles', component: StockpileListComponent, canActivate: [AuthGuard] },
+  { path: 'stockpiles/new', component: StockpileFormComponent, canActivate: [AuthGuard] },
+  { path: 'stockpiles/edit/:id', component: StockpileFormComponent, canActivate: [AuthGuard] }
 ];
 
 @NgModule({
@@ -659,44 +662,40 @@ const routes: Routes = [
 export class AppRoutingModule { }
 EOF
 
-# Update app.module.ts
-cat > src/app/app.module.ts << 'EOF'
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { HttpClientModule } from '@angular/common/http';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+# Update app component with auth-aware navigation
+print_status "Updating app component..."
+cat > src/app/app.component.ts << 'EOF'
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from './services/auth.service';
 
-import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
-import { LoginComponent } from './components/login/login.component';
-import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { StockpileListComponent } from './components/stockpile-list/stockpile-list.component';
-import { StockpileFormComponent } from './components/stockpile-form/stockpile-form.component';
-
-@NgModule({
-  declarations: [
-    AppComponent,
-    LoginComponent,
-    DashboardComponent,
-    StockpileListComponent,
-    StockpileFormComponent
-  ],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    HttpClientModule,
-    FormsModule,
-    ReactiveFormsModule
-  ],
-  providers: [],
-  bootstrap: [AppComponent]
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.scss']
 })
-export class AppModule { }
+export class AppComponent {
+  title = 'Stockpile Management';
+
+  get isLoggedIn(): boolean {
+    return this.authService.currentUserValue !== null;
+  }
+
+  constructor(
+    private router: Router,
+    private authService: AuthService
+  ) {}
+
+  logout(event: Event): void {
+    event.preventDefault();
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
+}
 EOF
 
-# Update app.component.html
 cat > src/app/app.component.html << 'EOF'
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark" *ngIf="isLoggedIn">
   <div class="container">
     <a class="navbar-brand" href="#">Stockpile App</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -711,6 +710,11 @@ cat > src/app/app.component.html << 'EOF'
           <a class="nav-link" routerLink="/stockpiles" routerLinkActive="active">Stockpiles</a>
         </li>
       </ul>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="#" (click)="logout($event)">Logout</a>
+        </li>
+      </ul>
     </div>
   </div>
 </nav>
@@ -718,20 +722,6 @@ cat > src/app/app.component.html << 'EOF'
 <div class="container mt-4">
   <router-outlet></router-outlet>
 </div>
-EOF
-
-# Update app.component.ts
-cat > src/app/app.component.ts << 'EOF'
-import { Component } from '@angular/core';
-
-@Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
-})
-export class AppComponent {
-  title = 'Stockpile Management';
-}
 EOF
 
 # Add Bootstrap CSS to index.html
